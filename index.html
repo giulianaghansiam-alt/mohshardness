@@ -8,10 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind CSS v4 Browser Runtime (supports border-3, backdrop-blur-xs, etc.) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 
   <style>
-   
     :root {
       --bg-canvas: #f4cf72;
       --bg-pattern: #e5bc54;
@@ -48,8 +48,19 @@
     }
 
     h1, h2, h3, .font-display {
-      font-family: 'Fredoka', sans-serif;
+      font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, sans-serif;
       letter-spacing: 0.01em;
+    }
+
+    /* Fallback utilities in case CDN is slow or blocked */
+    .border-3 {
+      border-width: 3px;
+      border-style: solid;
+    }
+
+    .backdrop-blur-xs {
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
     }
 
     /* High-visibility keyboard focus indicator (WCAG 2.4.7 Focus Visible) */
@@ -575,9 +586,6 @@
 
       /* ----------------------------------------------------------------------
          2. DATA: 8 CLASSROOM REFERENCE TEST MATERIALS
-         Note: Values are half-steps (2.5 to 9.0) so integer minerals 1–10
-         always give an unambiguous strictly-greater (scratched) or less-than
-         (not scratched) result!
          ---------------------------------------------------------------------- */
       const TEST_MATERIALS = [
         {
@@ -668,7 +676,7 @@
       let state = {
         currentMineral: null,
         usedMineralIds: [],
-        testedMaterials: {}, // { materialId: boolean (true = scratched, false = not scratched) }
+        testedMaterials: {},
         selectedGuess: null,
         testsUsed: 0,
         solvedCount: 0,
@@ -677,7 +685,7 @@
       };
 
       /* ----------------------------------------------------------------------
-         4. WEB AUDIO API SOUND EFFECTS (Zero external audio dependencies)
+         4. WEB AUDIO API SOUND EFFECTS
          ---------------------------------------------------------------------- */
       let audioCtx = null;
 
@@ -701,7 +709,6 @@
           if (!ctx) return;
           const now = ctx.currentTime;
 
-          // Short gritty noise burst for scratch action
           const bufferSize = ctx.sampleRate * 0.14;
           const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
           const data = buffer.getChannelData(0);
@@ -725,7 +732,6 @@
           gain.connect(ctx.destination);
           noise.start(now);
 
-          // Feedback tone: bright rising chime if scratched, low thud if not scratched
           const osc = ctx.createOscillator();
           const oscGain = ctx.createGain();
           osc.type = didScratch ? "triangle" : "sine";
@@ -739,9 +745,7 @@
           oscGain.connect(ctx.destination);
           osc.start(now + 0.08);
           osc.stop(now + 0.26);
-        } catch (e) {
-          // Gracefully ignore audio errors on restricted devices
-        }
+        } catch (e) {}
       }
 
       function playVictoryFanfare() {
@@ -749,7 +753,7 @@
         try {
           const ctx = getAudioContext();
           if (!ctx) return;
-          const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+          const notes = [523.25, 659.25, 783.99, 1046.5];
           notes.forEach((freq, idx) => {
             const now = ctx.currentTime + idx * 0.1;
             const osc = ctx.createOscillator();
@@ -792,18 +796,12 @@
       function buildMineralSVG(mineral) {
         return `
           <svg viewBox="0 0 120 120" class="w-full h-full drop-shadow-md" aria-hidden="true">
-            <!-- Base Rock Shadow -->
             <ellipse cx="60" cy="106" rx="38" ry="8" fill="#14243b" opacity="0.18"/>
-            <!-- Left Crystal Spire -->
             <polygon points="24,96 18,52 34,34 46,52 44,96" fill="${mineral.secondaryHex}" stroke="#14243b" stroke-width="3.5" stroke-linejoin="round"/>
-            <!-- Right Crystal Spire -->
             <polygon points="74,96 72,46 88,30 102,48 94,96" fill="${mineral.secondaryHex}" stroke="#14243b" stroke-width="3.5" stroke-linejoin="round"/>
-            <!-- Center Main Crystal -->
             <polygon points="38,100 34,42 60,16 86,42 82,100" fill="${mineral.primaryHex}" stroke="#14243b" stroke-width="4" stroke-linejoin="round"/>
-            <!-- Facet Highlight Lines -->
             <polyline points="34,42 60,54 86,42" fill="none" stroke="#14243b" stroke-width="3" stroke-linejoin="round"/>
             <line x1="60" y1="16" x2="60" y2="100" stroke="#14243b" stroke-width="3"/>
-            <!-- Sparkle Glint -->
             <polygon points="48,30 51,36 57,39 51,42 48,48 45,42 39,39 45,36" fill="#ffffff"/>
           </svg>
         `;
@@ -911,9 +909,8 @@
       /* ----------------------------------------------------------------------
          8. GAME INTERACTIONS
          ---------------------------------------------------------------------- */
-      function handleMaterialTest(material, buttonElement) {
+      function handleMaterialTest(material) {
         const alreadyTested = Object.prototype.hasOwnProperty.call(state.testedMaterials, material.id);
-        // Rule: Mystery Mineral scratches test material if Mystery Hardness > Material Hardness
         const didScratch = state.currentMineral.hardness > material.hardness;
 
         if (!alreadyTested) {
@@ -924,14 +921,11 @@
         state.testedMaterials[material.id] = didScratch;
         playScratchSound(didScratch);
 
-        // Animate specimen stage
         const stage = document.getElementById("specimen-stage");
         stage.classList.remove("animate-scratch");
-        void stage.offsetWidth; // trigger reflow
+        void stage.offsetWidth;
         stage.classList.add("animate-scratch");
 
-        // Update feedback box on Specimen Card
-        // Update feedback box underneath the 8 test materials
         const feedbackBox = document.getElementById("scratch-feedback-box");
         if (didScratch) {
           feedbackBox.className = "w-full min-h-[64px] mt-4 rounded-xl border-2 border-[#15803d] bg-[#dcfce7] p-3.5 flex items-center justify-center text-center text-sm sm:text-base font-extrabold text-black";
@@ -958,13 +952,11 @@
         }
 
         if (state.selectedGuess === state.currentMineral.hardness) {
-          // CORRECT GUESS!
           state.solvedCount += 1;
           document.getElementById("solved-count").textContent = state.solvedCount;
           playVictoryFanfare();
           showVictorySplash();
         } else {
-          // INCORRECT GUESS - Give helpful 5th-grade guidance
           playTryAgainTone();
           const directionHint =
             state.selectedGuess < state.currentMineral.hardness
@@ -990,14 +982,12 @@
 
         announceToScreenReader(`Congratulations! You correctly identified ${m.name} with Mohs hardness ${m.hardness} in ${state.testsUsed} scratch tests.`);
 
-        // Move keyboard focus to Play Again button inside dialog
         setTimeout(() => {
           document.getElementById("play-again-btn").focus();
         }, 50);
       }
 
       function startNewRound() {
-        // Cycle through all 10 minerals without repeating until all 10 have been played
         let availableMinerals = MINERALS.filter((m) => !state.usedMineralIds.includes(m.id));
         if (availableMinerals.length === 0) {
           const lastPlayedId = state.usedMineralIds[state.usedMineralIds.length - 1];
@@ -1039,7 +1029,6 @@
         document.getElementById("play-again-btn").addEventListener("click", startNewRound);
         document.getElementById("new-rock-top-btn").addEventListener("click", startNewRound);
 
-        // Sound toggle button
         const soundBtn = document.getElementById("sound-toggle-btn");
         soundBtn.addEventListener("click", () => {
           state.soundEnabled = !state.soundEnabled;
@@ -1048,7 +1037,6 @@
           document.getElementById("sound-label").textContent = state.soundEnabled ? "Sound On" : "Muted";
         });
 
-        // Trap focus inside victory modal when open
         const modal = document.getElementById("victory-modal");
         modal.addEventListener("keydown", (e) => {
           if (e.key === "Tab") {
@@ -1057,7 +1045,6 @@
           }
         });
 
-        // Start first round
         startNewRound();
       });
     })();
